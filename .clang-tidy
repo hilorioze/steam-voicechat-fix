@@ -1,0 +1,14 @@
+Checks: >
+  *,
+  -altera-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -google-readability-braces-around-statements,
+  -hicpp-braces-around-statements,
+  -hicpp-signed-bitwise,
+  -llvmlibc-*,
+  -performance-no-int-to-ptr,
+  -readability-braces-around-statements,
+  -readability-function-cognitive-complexity,
+  -readability-magic-numbers
+CheckOptions:
+  misc-include-cleaner.MissingIncludes: false

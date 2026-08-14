@@ -1,0 +1,131 @@
+on:
+  push:
+    branches: &branches
+      - main
+
+    paths: &paths
+      - .github/workflows/build.yaml
+
+      - "src/**"
+      - CMakeLists.txt
+
+      # workflow reads `nixConfig` and uses `--inputs-from .`, so changes to them may affect the result
+      - flake.nix
+      - flake.lock
+
+  pull_request:
+    branches: *branches
+
+    paths: *paths
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    concurrency:
+      # one run per ref; latest cancels older runs
+      group: ${{ github.workflow }}-${{ github.ref }}
+
+      cancel-in-progress: true
+
+    permissions:
+      id-token: write # required so `niks3` can authenticate via OIDC
+      contents: write # required for publishing releases
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+            fsync-metadata = false # performance over durability in CI; store is transient
+
+      - run: |
+          {
+            printf 'NIX_CONFIG<<EOF\n'
+            printf 'extra-substituters = %s\n' "$(nix eval --raw --file flake.nix --apply 'flake: builtins.concatStringsSep " " flake.nixConfig.extra-substituters')"
+            printf 'extra-trusted-public-keys = %s\n' "$(nix eval --raw --file flake.nix --apply 'flake: builtins.concatStringsSep " " flake.nixConfig.extra-trusted-public-keys')"
+            printf 'EOF\n'
+          } >> "$GITHUB_ENV"
+
+      - if: github.event_name != 'pull_request'
+        id: fetch-niks3-bin
+        run: |
+          # `niks3-action` looks for `niks3-hook` next to `niks3`
+          # `--inputs-from github:hilorioze/nixos-dotfiles` keeps CLI and server on the same version to avoid API mismatches
+          niks3_root=$(NIX_PATH=nixpkgs=flake:nixpkgs:niks3=flake:niks3 nix build --impure --no-link --print-out-paths --inputs-from github:hilorioze/nixos-dotfiles --print-build-logs --expr $'
+          let
+            pkgs = import <nixpkgs> {};
+
+            lib = pkgs.lib;
+
+            niks3ActionBinDir = pkgs.symlinkJoin {
+              name = "niks3-action-bin-dir";
+
+              paths = with import <niks3/nix/packages> {inherit pkgs;}; [
+                # keep-sorted start
+                niks3
+                niks3-hook
+                # keep-sorted end
+              ];
+            };
+          in
+            pkgs.linkFarm "niks3-action-bin" [
+              # keep-sorted start block=yes newline_separated=yes
+              {
+                name = "bin/niks3";
+
+                path = lib.getExe\' niks3ActionBinDir "niks3";
+              }
+
+              {
+                name = "bin/niks3-hook";
+
+                path = lib.getExe\' niks3ActionBinDir "niks3-hook";
+              }
+              # keep-sorted end
+            ]
+            ')
+
+          printf 'niks3_root=%s\nniks3_bin=%s\n' "$niks3_root" "$niks3_root/bin/niks3" >> "$GITHUB_OUTPUT"
+
+      - if: github.event_name != 'pull_request'
+        uses: Mic92/niks3-action@12d3e320b2a99b7938f9634bd337cd9fec104609 # v1.1.0
+        with:
+          niks3-bin: ${{ steps.fetch-niks3-bin.outputs.niks3_bin }}
+
+          server-url: ${{ vars.NIKS3_SERVER_URL }}
+
+      # cache the built `fetch-niks3-bin` output so later runs can reuse it
+      - if: github.event_name != 'pull_request'
+        run: ${{ steps.fetch-niks3-bin.outputs.niks3_bin }} push --server-url ${{ vars.NIKS3_SERVER_URL }} --auth-token-script "node $RUNNER_TEMP/niks3/fetch-oidc-token.mjs" ${{ steps.fetch-niks3-bin.outputs.niks3_root }}
+
+      - id: build
+        run: |
+          RESULT=$(nix build --no-link --print-out-paths --print-build-logs .#packages.i686-linux.default)
+          printf 'result=%s\n' "$RESULT" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" != pull_request ]; then
+            printf 'content_hash=%s\n' "$(nix hash path --type sha256 --base32 "$RESULT")" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: ${{ steps.build.outputs.result }}/lib/libsteam_voicechat_fix.so
+
+          archive: false
+
+      - if: github.event_name != 'pull_request'
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
+        with:
+          tag: ${{ steps.build.outputs.content_hash }}
+          commit: ${{ github.sha }} # pin build commit to tag
+
+          artifacts: ${{ steps.build.outputs.result }}/lib/libsteam_voicechat_fix.so
+
+          makeLatest: true
+          skipIfReleaseExists: true

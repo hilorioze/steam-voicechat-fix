@@ -1,0 +1,9 @@
+# build artifacts
+/result
+/result-*
+/build/
+
+# development environment (auto-generated)
+/.devenv/
+/.direnv/
+/.pre-commit-config.yaml

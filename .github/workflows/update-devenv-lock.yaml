@@ -1,0 +1,155 @@
+on:
+  push:
+    branches:
+      - main
+
+    paths:
+      - .github/workflows/update-devenv-lock.yaml
+
+      - devenv.yaml
+
+      # workflow reads `nixConfig` and uses `--inputs-from .`, so changes to them may affect the result
+      - flake.nix
+      - flake.lock
+
+  schedule:
+    # run weekly on mondays at 00:00 UTC
+    - cron: "0 0 * * 1"
+
+  workflow_dispatch:
+
+jobs:
+  update-devenv-lock:
+    concurrency:
+      # one workflow run at a time; latest completes last
+      group: ${{ github.workflow }}
+
+      cancel-in-progress: false
+
+    permissions:
+      id-token: write # required so `niks3` can authenticate via OIDC
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+            fsync-metadata = false # performance over durability in CI; store is transient
+
+      - run: |
+          {
+            printf 'NIX_CONFIG<<EOF\n'
+            printf 'extra-substituters = %s\n' "$(nix eval --raw --file flake.nix --apply 'flake: builtins.concatStringsSep " " flake.nixConfig.extra-substituters')"
+            printf 'extra-trusted-public-keys = %s\n' "$(nix eval --raw --file flake.nix --apply 'flake: builtins.concatStringsSep " " flake.nixConfig.extra-trusted-public-keys')"
+            printf 'EOF\n'
+          } >> "$GITHUB_ENV"
+
+      - id: fetch-niks3-bin
+        run: |
+          # `niks3-action` looks for `niks3-hook` next to `niks3`
+          # `--inputs-from github:hilorioze/nixos-dotfiles` keeps CLI and server on the same version to avoid API mismatches
+          niks3_root=$(NIX_PATH=nixpkgs=flake:nixpkgs:niks3=flake:niks3 nix build --impure --no-link --print-out-paths --inputs-from github:hilorioze/nixos-dotfiles --print-build-logs --expr $'
+          let
+            pkgs = import <nixpkgs> {};
+
+            lib = pkgs.lib;
+
+            niks3ActionBinDir = pkgs.symlinkJoin {
+              name = "niks3-action-bin-dir";
+
+              paths = with import <niks3/nix/packages> {inherit pkgs;}; [
+                # keep-sorted start
+                niks3
+                niks3-hook
+                # keep-sorted end
+              ];
+            };
+          in
+            pkgs.linkFarm "niks3-action-bin" [
+              # keep-sorted start block=yes newline_separated=yes
+              {
+                name = "bin/niks3";
+
+                path = lib.getExe\' niks3ActionBinDir "niks3";
+              }
+
+              {
+                name = "bin/niks3-hook";
+
+                path = lib.getExe\' niks3ActionBinDir "niks3-hook";
+              }
+              # keep-sorted end
+            ]
+            ')
+
+          printf 'niks3_root=%s\nniks3_bin=%s\n' "$niks3_root" "$niks3_root/bin/niks3" >> "$GITHUB_OUTPUT"
+
+      - uses: Mic92/niks3-action@12d3e320b2a99b7938f9634bd337cd9fec104609 # v1.1.0
+        with:
+          niks3-bin: ${{ steps.fetch-niks3-bin.outputs.niks3_bin }}
+
+          server-url: ${{ vars.NIKS3_SERVER_URL }}
+
+      # cache the built `fetch-niks3-bin` output so later runs can reuse it
+      - run: ${{ steps.fetch-niks3-bin.outputs.niks3_bin }} push --server-url ${{ vars.NIKS3_SERVER_URL }} --auth-token-script "node $RUNNER_TEMP/niks3/fetch-oidc-token.mjs" ${{ steps.fetch-niks3-bin.outputs.niks3_root }}
+
+      - id: update-devenv-lock
+        run: |
+          nix run --inputs-from . nixpkgs#devenv -- update
+
+          # auto-generate files (e.g. `.devcontainer/devcontainer.json`) and format code (`treefmt` & `git-hooks`) after lock and file updates
+          nix run --inputs-from . nixpkgs#devenv -- test || true
+
+          body=$RUNNER_TEMP/devenv-lock-body.md
+
+          jq --raw-output --null-input \
+            --argjson before "$(git show HEAD:devenv.lock)" \
+            --argjson after "$(< devenv.lock)" '
+              $before.nodes as $before_nodes |
+              $after.nodes as $after_nodes |
+              [$after_nodes | keys[] as $input |
+                $before_nodes[$input].locked as $before_locked |
+                $after_nodes[$input].locked as $after_locked |
+                select($after_locked.rev != $before_locked.rev) |
+                {
+                  name: $input,
+                  url: "https://github.com/\($after_locked.owner)/\($after_locked.repo)",
+                  old_rev: $before_locked.rev,
+                  new_rev: $after_locked.rev
+                }
+              ] |
+              (if length == 1 then "Updates 1 input:" else "Updates \(length) inputs:" end) +
+              "\n\n| Input | From | To |\n| --- | --- | --- |\n" +
+              (map("| [`\(.name)`](\(.url)) | [`\(.old_rev[:7])`](\(.url)/commit/\(.old_rev)) | [`\(.new_rev[:7])`](\(.url)/commit/\(.new_rev)) |") | join("\n")) +
+              "\n" +
+              (map(
+                "\nUpdates [`\(.name)`](\(.url)) from [`\(.old_rev[:7])`](\(.url)/commit/\(.old_rev)) to [`\(.new_rev[:7])`](\(.url)/commit/\(.new_rev))\n\n" +
+                "- [Diff](\(.url)/compare/\(.old_rev)...\(.new_rev))"
+              ) | join("\n"))
+            ' > "$body"
+
+          printf 'body-path=%s\n' "$body" >> "$GITHUB_OUTPUT"
+
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.DEVENV_UPDATE_PAT }}
+
+          branch: automation/update-devenv-lock
+          delete-branch: true
+
+          assignees: hilorioze
+          labels: |
+            dependencies
+            nix
+            devenv
+            automated
+
+          commit-message: "chore(deps/devenv): update"
+          title: "chore(deps/devenv): update"
+
+          body-path: ${{ steps.update-devenv-lock.outputs.body-path }}
