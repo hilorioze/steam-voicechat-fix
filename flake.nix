@@ -35,6 +35,7 @@
     }:
       stdenv.mkDerivation {
         pname = "steam-voicechat-fix";
+
         version = "0";
 
         src = lib.fileset.toSource {
@@ -51,7 +52,7 @@
         installPhase = ''
           runHook preInstall
 
-          install -Dm444 libsteam_voicechat_fix.so $out/lib/libsteam_voicechat_fix.so
+          install -D --mode=444 libsteam_voicechat_fix.so $out/lib/libsteam_voicechat_fix.so
 
           runHook postInstall
         '';

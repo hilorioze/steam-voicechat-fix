@@ -47,7 +47,7 @@ jobs:
             printf 'extra-substituters = %s\n' "$(nix eval --raw --file flake.nix --apply 'flake: builtins.concatStringsSep " " flake.nixConfig.extra-substituters')"
             printf 'extra-trusted-public-keys = %s\n' "$(nix eval --raw --file flake.nix --apply 'flake: builtins.concatStringsSep " " flake.nixConfig.extra-trusted-public-keys')"
             printf 'EOF\n'
-          } >> "$GITHUB_ENV"
+          } >> $GITHUB_ENV
 
       - id: fetch-niks3-bin
         run: |
@@ -87,16 +87,16 @@ jobs:
             ]
             ')
 
-          printf 'niks3_root=%s\nniks3_bin=%s\n' "$niks3_root" "$niks3_root/bin/niks3" >> "$GITHUB_OUTPUT"
+          printf 'niks3_root=%s\nniks3_bin=%s\n' $niks3_root $niks3_root/bin/niks3 >> $GITHUB_OUTPUT
 
       - uses: Mic92/niks3-action@12d3e320b2a99b7938f9634bd337cd9fec104609 # v1.1.0
         with:
           niks3-bin: ${{ steps.fetch-niks3-bin.outputs.niks3_bin }}
 
-          server-url: ${{ vars.NIKS3_SERVER_URL }}
+          server-url: ${{ vars.NIKS3_SERVER }}
 
       # cache the built `fetch-niks3-bin` output so later runs can reuse it
-      - run: ${{ steps.fetch-niks3-bin.outputs.niks3_bin }} push --server-url ${{ vars.NIKS3_SERVER_URL }} --auth-token-script "node $RUNNER_TEMP/niks3/fetch-oidc-token.mjs" ${{ steps.fetch-niks3-bin.outputs.niks3_root }}
+      - run: ${{ steps.fetch-niks3-bin.outputs.niks3_bin }} push --server-url ${{ vars.NIKS3_SERVER }} --auth-token-script "node $RUNNER_TEMP/niks3/fetch-oidc-token.mjs" ${{ steps.fetch-niks3-bin.outputs.niks3_root }}
 
       - id: update-devenv-lock
         run: |
@@ -109,7 +109,7 @@ jobs:
 
           jq --raw-output --null-input \
             --argjson before "$(git show HEAD:devenv.lock)" \
-            --argjson after "$(< devenv.lock)" '
+            --argjson after "$(<devenv.lock)" '
               $before.nodes as $before_nodes |
               $after.nodes as $after_nodes |
               [$after_nodes | keys[] as $input |
@@ -131,9 +131,9 @@ jobs:
                 "\nUpdates [`\(.name)`](\(.url)) from [`\(.old_rev[:7])`](\(.url)/commit/\(.old_rev)) to [`\(.new_rev[:7])`](\(.url)/commit/\(.new_rev))\n\n" +
                 "- [Diff](\(.url)/compare/\(.old_rev)...\(.new_rev))"
               ) | join("\n"))
-            ' > "$body"
+            ' > $body
 
-          printf 'body-path=%s\n' "$body" >> "$GITHUB_OUTPUT"
+          printf 'body-path=%s\n' $body >> $GITHUB_OUTPUT
 
       - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:

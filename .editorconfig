@@ -14,4 +14,3 @@ trim_trailing_whitespace = true
 # preserve markdown hard linebreaks (https://github.github.com/gfm/#hard-line-break)
 [*.md]
 trim_trailing_whitespace = false
-

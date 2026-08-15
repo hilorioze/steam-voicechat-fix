@@ -37,9 +37,20 @@
     };
   };
 
-  git-hooks.hooks = {
+  git-hooks.hooks = let
+    ignoredShellcheckRules = [
+      # keep-sorted start
+      "SC2086" # unquoted variables; referenced are safe
+      "SC2162" # `read` without `-r`; intentional too, paths and stuff don't have backslashes
+      # keep-sorted end
+    ];
+  in {
     # keep-sorted start block=yes newline_separated=yes
-    actionlint.enable = true;
+    actionlint = {
+      enable = true;
+
+      args = map (code: "-ignore=${code}") ignoredShellcheckRules;
+    };
 
     check-merge-conflicts = {
       enable = true;
@@ -76,7 +87,7 @@
       # cache `/nix` between rebuilds
       mounts = ["source=devcontainer-nix,target=/nix,type=volume"];
 
-      onCreateCommand = "sudo sh -c 'echo \"accept-flake-config = true\" >> /etc/nix/nix.conf'";
+      onCreateCommand = ''sudo sh -c 'printf "accept-flake-config = true\n" >> /etc/nix/nix.conf' '';
 
       customizations.vscode.extensions = [
         # keep-sorted start

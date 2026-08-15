@@ -49,7 +49,7 @@ jobs:
             printf 'extra-substituters = %s\n' "$(nix eval --raw --file flake.nix --apply 'flake: builtins.concatStringsSep " " flake.nixConfig.extra-substituters')"
             printf 'extra-trusted-public-keys = %s\n' "$(nix eval --raw --file flake.nix --apply 'flake: builtins.concatStringsSep " " flake.nixConfig.extra-trusted-public-keys')"
             printf 'EOF\n'
-          } >> "$GITHUB_ENV"
+          } >> $GITHUB_ENV
 
       - if: github.event_name != 'pull_request'
         id: fetch-niks3-bin
@@ -90,17 +90,17 @@ jobs:
             ]
             ')
 
-          printf 'niks3_root=%s\nniks3_bin=%s\n' "$niks3_root" "$niks3_root/bin/niks3" >> "$GITHUB_OUTPUT"
+          printf 'niks3_root=%s\nniks3_bin=%s\n' $niks3_root $niks3_root/bin/niks3 >> $GITHUB_OUTPUT
 
       - if: github.event_name != 'pull_request'
         uses: Mic92/niks3-action@12d3e320b2a99b7938f9634bd337cd9fec104609 # v1.1.0
         with:
           niks3-bin: ${{ steps.fetch-niks3-bin.outputs.niks3_bin }}
 
-          server-url: ${{ vars.NIKS3_SERVER_URL }}
+          server-url: ${{ vars.NIKS3_SERVER }}
 
       # cache the built `fetch-niks3-bin` output so later runs can reuse it
       - if: github.event_name != 'pull_request'
-        run: ${{ steps.fetch-niks3-bin.outputs.niks3_bin }} push --server-url ${{ vars.NIKS3_SERVER_URL }} --auth-token-script "node $RUNNER_TEMP/niks3/fetch-oidc-token.mjs" ${{ steps.fetch-niks3-bin.outputs.niks3_root }}
+        run: ${{ steps.fetch-niks3-bin.outputs.niks3_bin }} push --server-url ${{ vars.NIKS3_SERVER }} --auth-token-script "node $RUNNER_TEMP/niks3/fetch-oidc-token.mjs" ${{ steps.fetch-niks3-bin.outputs.niks3_root }}
 
       - run: nix run --inputs-from . nixpkgs#devenv -- build test

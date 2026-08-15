@@ -30,7 +30,7 @@ jobs:
       - id: resolve-pull-request
         run: |
           gh api \
-            "repos/$GH_REPO/commits/${{ github.event.workflow_run.head_sha }}/pulls" \
+            repos/$GH_REPO/commits/${{ github.event.workflow_run.head_sha }}/pulls \
             --jq '
               first(
                 .[] |
@@ -42,7 +42,7 @@ jobs:
                 )
               ) |
               "number=\(.number)"
-            ' >> "$GITHUB_OUTPUT"
+            ' >> $GITHUB_OUTPUT
 
       - if: steps.resolve-pull-request.outputs.number
         env:
@@ -50,12 +50,12 @@ jobs:
         run: |
           # wait for all PR checks to pass
           gh pr checks \
-            "$PR_NUMBER" \
+            $PR_NUMBER \
             --watch \
             --fail-fast
 
           gh pr merge \
-            "$PR_NUMBER" \
+            $PR_NUMBER \
             --squash \
             --delete-branch \
             --match-head-commit ${{ github.event.workflow_run.head_sha }}
