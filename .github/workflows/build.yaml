@@ -94,7 +94,7 @@ jobs:
           printf 'niks3_root=%s\nniks3_bin=%s\n' $niks3_root $niks3_root/bin/niks3 >> $GITHUB_OUTPUT
 
       - if: github.event_name != 'pull_request'
-        uses: Mic92/niks3-action@12d3e320b2a99b7938f9634bd337cd9fec104609 # v1.1.0
+        uses: Mic92/niks3-action@f0743610fddd7d96239c78d9e457440fc15019e2 # v1.4.0
         with:
           niks3-bin: ${{ steps.fetch-niks3-bin.outputs.niks3_bin }}
 
@@ -116,7 +116,7 @@ jobs:
             fi
           } >> $GITHUB_OUTPUT
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           path: ${{ steps.build.outputs.result }}/lib/libsteam_voicechat_fix.so
 
