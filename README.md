@@ -2,6 +2,9 @@
 
 Inspired by and based on [makindotcc](https://github.com/makindotcc)'s work on [hl-linux-voicechat-crash-fix](https://github.com/makindotcc/hl-linux-voicechat-crash-fix)
 
+> [!NOTE]
+> Archived: the 64-bit Steam client, default on Linux since November 2026, doesn't crash on this. The fix only applies to the old 32-bit client (`STEAM_FORCE_CLIENT=ubuntu12_32`)
+
 > [!WARNING]
 > I cannot guarantee that this will not result in a VAC ban. Game processes are
 > not patched, and only Steam's main-process `steamclient.so` is modified. I use
