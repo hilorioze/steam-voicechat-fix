@@ -16,13 +16,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
   };
 
-  outputs = inputs @ {
-    # keep-sorted start
-    flake-parts,
-    nixpkgs,
-    # keep-sorted end
-    ...
-  }: let
+  outputs = inputs @ {flake-parts, ...}: let
     systems = ["i686-linux"];
 
     steam-voicechat-fix = {
@@ -61,7 +55,7 @@
           description = "Automatic LD_PRELOAD fix for Steam's Linux voice-chat decoder crash in GoldSrc games";
           homepage = "https://github.com/hilorioze/steam-voicechat-fix";
 
-          license = lib.licenses.unfree;
+          license = lib.licenses.mit;
 
           platforms = systems;
         };
@@ -70,13 +64,7 @@
     flake-parts.lib.mkFlake {inherit inputs;} {
       inherit systems;
 
-      perSystem = {system, ...}: let
-        pkgs = import nixpkgs {
-          inherit system;
-
-          config.allowUnfree = true;
-        };
-
+      perSystem = {pkgs, ...}: let
         package = pkgs.callPackage steam-voicechat-fix {};
       in {
         packages = {
