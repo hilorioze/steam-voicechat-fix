@@ -158,11 +158,6 @@ Alternatively, you can reference it directly instead of adding the overlay:
 
    The resulting library should appear at `build/libsteam_voicechat_fix.so`
 
-## Troubleshooting
-
-Start Steam from a terminal and include all `steam-voicechat-fix:` messages
-when reporting a problem
-
 ## License
 
 [MIT](LICENSE)
