@@ -7,7 +7,7 @@ Inspired by and based on [makindotcc](https://github.com/makindotcc)'s work on [
 
 > [!WARNING]
 > I cannot guarantee that this will not result in a VAC ban. Game processes are
-> not patched, and only Steam's main-process `steamclient.so` is modified. I use
+> not patched, and only Steam's main-process `steamclient.so` is modified. I used
 > this on my main Steam account, and AFAIK it should not trigger any traps. This
 > is only my experience. Use it at your own risk!
 
