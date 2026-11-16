@@ -61,27 +61,13 @@ Add the flake input and overlay, then configure Steam to preload the package:
 
 ```nix
 {
-  # optionally use the binary cache
-  # nixConfig = {
-  #   # keep-sorted start block=yes newline_separated=yes
-  #   extra-substituters = [
-  #     # https://cache.nixos.org has priority 40
-  #     "https://nix-cache.hilorioze.com?priority=41"
-  #   ];
-  #
-  #   extra-trusted-public-keys = [
-  #     "nix-cache.hilorioze.com-1:vKKWGjVDgXl/TXbUWuPWTnDhhDit6hqkTcuoGfter5Y="
-  #   ];
-  #   # keep-sorted end
-  # };
-
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
     steam-voicechat-fix = {
       url = "github:hilorioze/steam-voicechat-fix";
 
-      inputs.nixpkgs.follows = "nixpkgs"; # remove when using the binary cache above
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
