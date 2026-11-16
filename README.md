@@ -162,3 +162,7 @@ Alternatively, you can reference it directly instead of adding the overlay:
 
 Start Steam from a terminal and include all `steam-voicechat-fix:` messages
 when reporting a problem
+
+## License
+
+[MIT](LICENSE)
